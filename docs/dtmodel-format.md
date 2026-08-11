@@ -196,18 +196,39 @@ Published as an asset of each release, next to the `.dtmodel` files:
 
 ```json
 {
+  "schema": 1,
   "models": {
     "upscale-bsrgan": {
       "version": "1.0",
-      "sha256": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      "sha256": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "size": 54935127,
+      "name": "upscale bsrgan",
+      "description": "BSRGAN 2x and 4x super-resolution",
+      "task": "upscale",
+      "license": "Apache-2.0"
     }
   }
 }
 ```
 
-`version` drives update detection; `sha256` (note the mandatory `sha256:`
-prefix) lets darktable verify a download and skip a rate-limited GitHub API
-call per asset. The digest is over the whole `.dtmodel` file.
+| Key | Present | Meaning |
+|---|---|---|
+| `version` | always | drives update detection |
+| `name`, `description`, `task` | when set in `model.yaml` | what a model is, for an installer listing a release |
+| `license` | when `model_card.license` is set | licence of the weights |
+| `sha256` | with `--artifacts-dir` | digest of the whole `.dtmodel`; the `sha256:` prefix is mandatory, darktable ignores a bare digest |
+| `size` | with `--artifacts-dir` | download size in bytes |
+
+The display fields exist because this file is the **only** place an installer
+can learn about a model released after a given darktable build: darktable's
+catalogue is bundled at build time, so a newer model appears here and nowhere
+else. Keep the file small – it is fetched on every update check, and the full
+model card already travels inside the package's `config.json`.
+
+`schema` is frozen at `1`; a consumer meeting anything else should warn rather
+than guess, as darktable already does for `releases-index.json`. Readers should
+ignore unknown keys, which is what makes adding these fields safe for older
+clients.
 
 Assets are fetched from
 `https://github.com/<owner>/<repo>/releases/download/<tag>/<model-id>.dtmodel`.

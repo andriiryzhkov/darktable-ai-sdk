@@ -189,7 +189,37 @@ def test_versions_writes_model_versions(repo: Path) -> None:
 
     import json
     data = json.loads((repo / "output" / "versions.json").read_text())
-    assert data == {"models": {"alpha": {"version": "1.0"}}}
+    assert data["schema"] == 1
+    assert data["models"] == {
+        "alpha": {"version": "1.0", "name": "alpha",
+                  "description": "fixture", "task": "general"},
+    }
+
+
+def test_versions_carries_display_metadata(tmp_path: Path,
+                                           monkeypatch: pytest.MonkeyPatch) -> None:
+    """A model absent from darktable's bundled catalogue has nowhere else
+    to get its name and task from, so the release manifest must carry them."""
+    import json
+
+    (tmp_path / "pyproject.toml").write_text(PYPROJECT)
+    d = tmp_path / "models" / "fancy"
+    d.mkdir(parents=True)
+    (d / "model.yaml").write_text(
+        "id: fancy\nname: Fancy Model\ndescription: does things\n"
+        "task: upscale\nversion: \"2.0\"\n"
+        "model_card:\n  license: Apache-2.0\n")
+    monkeypatch.chdir(tmp_path)
+
+    assert CliRunner().invoke(main, ["versions"]).exit_code == 0
+    entry = json.loads(
+        (tmp_path / "output" / "versions.json").read_text())["models"]["fancy"]
+
+    assert entry == {"version": "2.0", "name": "Fancy Model",
+                     "description": "does things", "task": "upscale",
+                     "license": "Apache-2.0"}
+    # no artifact was given, so nothing derived from the archive appears
+    assert "sha256" not in entry and "size" not in entry
 
 
 def test_versions_adds_sha256_from_artifacts(repo: Path) -> None:
@@ -209,6 +239,7 @@ def test_versions_adds_sha256_from_artifacts(repo: Path) -> None:
     entry = json.loads((repo / "output" / "versions.json").read_text())["models"]["alpha"]
     # the "sha256:" prefix is mandatory – darktable ignores a bare digest
     assert entry["sha256"] == f"sha256:{hashlib.sha256(blob).hexdigest()}"
+    assert entry["size"] == len(blob)
 
 
 def test_versions_accepts_nested_ci_layout(repo: Path) -> None:

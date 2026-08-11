@@ -233,9 +233,16 @@ def git_version_cmd(ctx, prefix):
 def versions_cmd(ctx, artifacts_dir):
     """Write output/versions.json for a release.
 
-    darktable reads this next to the .dtmodel assets to decide whether an
-    update is available, and to verify a download without spending a
-    rate-limited API call per asset. See docs/dtmodel-format.md.
+    darktable reads this next to the .dtmodel assets for three things: to
+    decide whether an update is available, to verify a download without
+    spending a rate-limited API call per asset, and to list what a release
+    offers. That last use is why entries carry display metadata – a model
+    published after a given darktable build is absent from its bundled
+    catalogue, so this file is the only place its name and task can come
+    from. See docs/dtmodel-format.md.
+
+    `sha256` and `size` need the built archive, so they appear only with
+    --artifacts-dir.
     """
     import hashlib
 
@@ -243,7 +250,22 @@ def versions_cmd(ctx, artifacts_dir):
     models = sorted((m for m in discover_or_fail(root) if not m.skip),
                     key=lambda m: m.id)
 
-    entries: dict[str, dict] = {m.id: {"version": m.version} for m in models}
+    entries: dict[str, dict] = {}
+    for m in models:
+        entry: dict = {"version": m.version}
+        # Enough to choose a model before downloading it, and no more: the
+        # full model card stays in the package's config.json, since this
+        # file is fetched on every update check.
+        if m.name:
+            entry["name"] = m.name
+        if m.description:
+            entry["description"] = m.description
+        if m.task:
+            entry["task"] = m.task
+        license_ = m.model_card.get("license")
+        if license_:
+            entry["license"] = license_
+        entries[m.id] = entry
 
     if artifacts_dir is not None:
         for m in models:
@@ -263,10 +285,17 @@ def versions_cmd(ctx, artifacts_dir):
             # the "sha256:" prefix is required – darktable ignores the
             # value without it
             entries[m.id]["sha256"] = f"sha256:{digest.hexdigest()}"
+            # download size, so an installer can say what it is about to
+            # fetch rather than starting a large transfer unannounced
+            entries[m.id]["size"] = path.stat().st_size
+
+    # schema is frozen at 1; consumers should warn on anything else rather
+    # than guess, as darktable already does for releases-index.json
+    data = {"schema": 1, "models": entries}
 
     output_path = root / "output" / "versions.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps({"models": entries}, indent=2) + "\n")
+    output_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
     click.echo(f"Generated {output_path}")
 
 
