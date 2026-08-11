@@ -9,7 +9,11 @@ run-name: Release models ${{ github.ref_name }}
 on:
   push:
     tags:
-      - 'release-*'
+      # only even-minor tags are real releases; an odd minor is a dev cycle
+      # and its tag exists for `git describe`, not to publish anything. this
+      # mirrors darktable's own numbering, which these releases track
+      - 'release-[0-9]+.[02468].[0-9]+'
+      - 'release-[0-9]+.[02468].[0-9]+.[0-9]+'
   workflow_dispatch:
 
 permissions:
@@ -104,6 +108,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
+          merge-multiple: true
 
       # --artifacts-dir adds a sha256 per model, which lets darktable
       # verify a download without one API call per asset.
@@ -123,5 +128,5 @@ jobs:
           name: "release ${{ steps.ver.outputs.version }}"
           draft: true  # review it, then publish from the UI
           artifacts: |
-            artifacts/*/*.dtmodel
+            artifacts/*.dtmodel
             output/versions.json

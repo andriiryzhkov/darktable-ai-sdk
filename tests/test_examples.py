@@ -86,7 +86,22 @@ def test_template_workflows_are_valid_yaml() -> None:
     assert "matrix.dep_group" in text and "matrix.id" in text
 
     # The release must produce the digests darktable verifies against.
-    assert "dtai versions --artifacts-dir" in (wf / "release.yml").read_text()
+    release_text = (wf / "release.yml").read_text()
+    assert "dtai versions --artifacts-dir" in release_text
+
+    # download-artifact nests each artifact in its own directory only when
+    # there is more than one, so a single-model repo published nothing at
+    # all until the layout was pinned. keep the two in step.
+    for wf_name in ("release.yml", "nightly.yml"):
+        text = (wf / wf_name).read_text()
+        assert "merge-multiple: true" in text, wf_name
+        assert "artifacts/*.dtmodel" in text, wf_name
+        assert "artifacts/*/*.dtmodel" not in text, wf_name
+
+    # an odd minor is a dev cycle: the tag anchors `git describe` and must
+    # not publish. a bare 'release-*' would fire on every one of them
+    tags = yaml.safe_load((wf / "release.yml").read_text())[True]["push"]["tags"]
+    assert all("[02468]" in pattern for pattern in tags), tags
 
 
 def test_template_releases_index_is_valid() -> None:

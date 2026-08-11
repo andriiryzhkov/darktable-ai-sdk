@@ -131,6 +131,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
+          merge-multiple: true
 
       - name: Generate versions.json
         run: uv run dtai versions --artifacts-dir artifacts
@@ -172,5 +173,5 @@ jobs:
             Install via *preferences → AI* in darktable, or download a
             `.dtmodel` and use *install from file*.
           artifacts: |
-            artifacts/*/*.dtmodel
+            artifacts/*.dtmodel
             output/versions.json
