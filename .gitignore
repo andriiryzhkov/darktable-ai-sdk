@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Build artifacts produced by running the example repo
+examples/*/output/
+examples/*/temp/
+*.dtmodel

@@ -1,0 +1,41 @@
+[project]
+name = "{{project_name}}"
+version = "0.1.0"
+description = "Model repository consumable by darktable as .dtmodel packages"
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    "darktable-ai-sdk>={{sdk_version}}",
+    # `dtai validate` loads each export to check it. The SDK imports
+    # onnxruntime lazily and does not depend on it itself.
+    "onnxruntime>=1.18",
+]
+
+# The SDK provides `dtai` with the full command set, and it finds this repo
+# by walking up from the cwd – so no entry point is needed here.
+#
+# To add repo-specific commands or a dependency-sync hook, uncomment this
+# and put them in {{module}}/cli.py; `dtai` imports the module on first
+# command lookup. Don't declare a `dtai` console script of your own – two
+# packages owning the same script name collide.
+#
+# [tool.dtai]
+# extend = "{{module}}.cli"
+
+[dependency-groups]
+# `core` is the default dep_group every model gets unless its model.yaml
+# names another, and CI runs `uv sync --group <dep_group>` – so this must
+# exist even when empty, or the first build fails on an unknown group.
+# Put dependencies shared by all models here.
+core = []
+
+# Add a group per model whose dependencies can't coexist with the others,
+# name it from that model's `dep_group:`, and CI gives it its own job:
+#   my-model = ["torch>=2.2", "onnx>=1.16"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["{{module}}"]

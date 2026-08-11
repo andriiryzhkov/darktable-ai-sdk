@@ -1,0 +1,39 @@
+[project]
+name = "minimal-repo"
+version = "0.1.0"
+description = "Smallest working model repository built on darktable-ai-sdk"
+requires-python = ">=3.11"
+readme = "README.md"
+
+# The SDK is the only hard dependency. Everything a *conversion* needs is
+# the repo's own business – here that's onnx (to build a graph) and
+# onnxruntime (so `dtai validate` can load it back).
+dependencies = [
+    "darktable-ai-sdk>=0.1.0a1",
+    "onnx>=1.16",
+    "onnxruntime>=1.18",
+]
+
+# No `[project.scripts]`: `dtai` comes from the SDK. This repo only adds a
+# command to it, which `dtai` picks up by importing the module named here.
+[tool.dtai]
+extend = "minimal_repo.cli"
+
+# This example lives inside the SDK repo, so it builds against the SDK
+# checkout two directories up rather than the published package. A
+# standalone repo drops this block and resolves from PyPI normally.
+# (uv-only; pip ignores it – see README.)
+[tool.uv.sources]
+darktable-ai-sdk = { path = "../..", editable = true }
+
+[dependency-groups]
+# Real repos put per-model dependency groups here and install them
+# on demand via the CLI's sync hook. This example needs none:
+#   nafnet = ["torch>=2.2", "onnx>=1.16"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["minimal_repo"]

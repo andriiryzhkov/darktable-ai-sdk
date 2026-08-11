@@ -1,0 +1,52 @@
+# The four required fields. Everything below them is optional.
+id: identity
+name: "identity passthrough"
+description: "Returns its input unchanged – a build-pipeline smoke test"
+task: denoise
+
+version: "1.0"
+arch: identity
+type: single
+tiling: false
+dep_group: core
+
+# Runtime hints, copied verbatim into config.json. darktable reads
+# individual keys from here; nothing is validated at build time.
+attributes:
+  input_sizes: [64]
+  color_space: rgb
+
+# Provenance, copied verbatim into config.json and shown in darktable's
+# model info panel. Fill these in honestly for a real model – especially
+# training_data_license, which is often stricter than the model license.
+model_card:
+  long_description: "A single-node identity graph used to exercise the convert → validate → package pipeline without downloading real weights. It does nothing to the image"
+  scope: "pipeline smoke test"
+  author: "darktable-ai-sdk examples"
+  source: "https://github.com/darktable-org/darktable-ai-sdk"
+  license: "GPL-3.0"
+  training_data: "none – the graph is constructed, not trained"
+  training_data_license: "n/a"
+  notes: "not a useful model; present only so the example repo builds end to end"
+
+# No `checkpoints:` – this model builds its weights from nothing.
+# A real model would list the upstream weights to download here:
+#
+#   checkpoints:
+#     - url: "https://example.com/weights.pth"
+#       path: "temp/identity/weights.pth"
+
+# No `repo:` either. A model needing upstream code at conversion time
+# vendors it as a submodule and points at it:
+#
+#   repo:
+#     submodule: vendor/upstream-project
+#     setup: pip install -r requirements.txt
+
+convert:
+  - script: convert.py
+    args:
+      # {output} expands to <repo-root>/output/identity
+      output: "{output}/model.onnx"
+      opset: 20
+      channels: 3

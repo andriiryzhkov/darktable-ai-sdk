@@ -1,0 +1,38 @@
+# Required fields.
+id: example
+name: Example Model
+description: Replace with a real model
+task: general
+
+# Optional. Quote the version – bare 1.0 is a float in YAML.
+# version: "1.0"
+# arch: generic
+# type: single          # single | split | multi
+# tiling: false
+# dep_group: core
+
+# Weights to fetch before converting. `path` is relative to the repo root;
+# `temp/<id>/` is the convention for intermediate files.
+# checkpoints:
+#   - url: https://example.com/weights.pth
+#     path: temp/example/weights.pth
+
+# Each step imports the script (path relative to this directory) and calls
+# its top-level `convert()` with these args. String values get {root},
+# {model_dir}, {temp}, {output} and {repo} substituted.
+# convert:
+#   - script: convert.py
+#     args:
+#       checkpoint: "{temp}/weights.pth"
+#       output: "{output}/model.onnx"
+
+# Provenance shown in darktable's model info panel. Worth filling in
+# properly – training_data_license is often stricter than `license`.
+# model_card:
+#   author: ""
+#   source: ""
+#   license: ""
+#   training_data: ""
+#   training_data_license: ""
+
+# Full schema: https://github.com/darktable-org/darktable-ai-sdk/blob/main/docs/model-yaml-spec.md

@@ -1,0 +1,114 @@
+name: Publish
+
+# Publishes to PyPI using Trusted Publishing (OIDC) – no API token is
+# stored in this repository. PyPI is configured to trust this specific
+# workflow file in this specific repo and environment; see the
+# "Publishing" section of README.md for the one-time setup.
+#
+#   git tag v0.1.0a1 && git push origin v0.1.0a1
+#
+# The tag must match __version__ in dt_ai_sdk/__init__.py, which is the
+# single source of truth for the version – the build fails otherwise.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Where to publish
+        required: true
+        default: testpypi
+        type: choice
+        options: [testpypi, pypi]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      # Publishing a tag that disagrees with the packaged version puts a
+      # wrong pin into every repo scaffolded by that release, and PyPI
+      # uploads cannot be replaced – so fail here instead.
+      - id: check
+        name: Verify the tag matches the packaged version
+        run: |
+          VERSION=$(uv run python -c "import dt_ai_sdk; print(dt_ai_sdk.__version__)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "packaged version: $VERSION"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME#v}"
+            if [ "$TAG" != "$VERSION" ]; then
+              echo "::error::tag v$TAG does not match __version__ $VERSION"
+              exit 1
+            fi
+          fi
+
+      - name: Run tests
+        run: uv run --extra dev pytest -q
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Check package metadata
+        run: uvx twine check dist/*
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  # TestPyPI first: a dry run that can be repeated, unlike PyPI where a
+  # version number is burned permanently once uploaded.
+  testpypi:
+    needs: build
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/darktable-ai-sdk
+    permissions:
+      id-token: write   # required for Trusted Publishing; no token needed
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  pypi:
+    needs: build
+    # Only a pushed tag, or a dispatch that explicitly asks for pypi.
+    # `github.ref_type == 'tag'` alone would also match a manual run
+    # launched *from* a tag, so asking for testpypi there would publish
+    # for real – and a PyPI version cannot be taken back.
+    if: ${{ (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi') }}
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/darktable-ai-sdk
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

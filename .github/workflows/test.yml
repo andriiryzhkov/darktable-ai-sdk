@@ -1,0 +1,70 @@
+name: Test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # every version the package claims to support in its classifiers
+        python: ["3.11", "3.12", "3.13", "3.14"]
+        os: [ubuntu-latest]
+        include:
+          # the scaffolder writes paths and renames files, so check the
+          # one platform where that behaves differently
+          - python: "3.12"
+            os: windows-latest
+    name: py${{ matrix.python }} / ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Run tests
+        run: uv run --python ${{ matrix.python }} --extra dev pytest -q
+
+  # A wheel that builds but ships no templates is broken in a way the unit
+  # tests can't see: `dtai init` would produce an empty repo.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v8.1.0
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Check package metadata
+        run: uvx twine check dist/*
+
+      - name: Verify the wheel can scaffold a repo
+        run: |
+          uv venv /tmp/check
+          VIRTUAL_ENV=/tmp/check uv pip install dist/*.whl
+          /tmp/check/bin/dtai init /tmp/scaffolded --name scaffolded
+          test -f /tmp/scaffolded/.github/workflows/release.yml
+          test -f /tmp/scaffolded/models/example/model.yaml
+          test -f /tmp/scaffolded/releases-index.json
+          echo "scaffold OK"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
