@@ -18,7 +18,7 @@ from dt_ai_sdk.gitversion import describe_version, version_prefix
 from dt_ai_sdk.package import package_model
 from dt_ai_sdk.validate import run_validation, validate_config_json, validate_onnx
 
-__version__ = "0.1.0a1"
+__version__ = "0.1.1a1"
 
 # CLI subpackage is imported lazily by consumers that want to compose commands;
 # not re-exported here to keep the top-level import path lightweight
