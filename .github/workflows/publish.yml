@@ -31,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.check.outputs.version }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v6
 
@@ -48,6 +49,12 @@ jobs:
           VERSION=$(uv run python -c "import dt_ai_sdk; print(dt_ai_sdk.__version__)")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "packaged version: $VERSION"
+          # PEP 440 decides what counts as a pre-release, not a substring
+          # match: 1.0.0.post1 is final, 1.0.0.dev4 is not.
+          PRE=$(uv run --with packaging python -c \
+            "from packaging.version import Version; print(str(Version('$VERSION').is_prerelease).lower())")
+          echo "prerelease=$PRE" >> "$GITHUB_OUTPUT"
+          echo "pre-release: $PRE"
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             TAG="${GITHUB_REF_NAME#v}"
             if [ "$TAG" != "$VERSION" ]; then
@@ -112,3 +119,35 @@ jobs:
           path: dist
 
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  # Mirror the tag as a GitHub release once PyPI has accepted the upload,
+  # so the release never claims a version that failed to publish. Ordinary
+  # installs come from PyPI; the attached sdist and wheel are for anyone
+  # who wants the exact artifacts without going through it.
+  github-release:
+    needs: [build, pypi]
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # release notes are generated from history
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: Publish GitHub release
+        uses: ncipollo/release-action@v1.21.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generateReleaseNotes: true
+          # alphas and betas must not show up as "Latest release"
+          prerelease: ${{ needs.build.outputs.prerelease }}
+          artifacts: dist/*
